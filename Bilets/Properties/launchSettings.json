@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Bilets": {
+      "commandName": "Project",
+      "commandLineArgs": "-q ../../../data/stsrpo.txt -r -d ../../../data/out/ -p ../../../data/pattern.txt"
+    }
+  }
+}
