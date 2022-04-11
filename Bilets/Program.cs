@@ -15,8 +15,10 @@ string questions_file = "questions.txt";
 string output_dir = "";
 string output_file = "card";
 bool randomize = false;
+bool randomize_in_cars = false;
 string latex_args = "";
 string pattern = "patern.txt";
+int clear_level = 0;
 
 
 
@@ -55,6 +57,9 @@ if (args.Length!=0)
             case "--random":
                 randomize = true;
                 continue;
+            case "-R":
+                randomize_in_cars = true;
+                continue;
             case "-a":
             case "--arguments":
                 latex_args = args[i+1];
@@ -65,11 +70,29 @@ if (args.Length!=0)
                 pattern = args[i + 1];
                 i++;
                 continue;
+            case "-c":
+            case "--clear-level":
+                clear_level = Int32.Parse(args[++i]);
+                continue;
             default: 
                 break;
         }
     }
 }
+
+if (!File.Exists(pattern))
+{
+    Console.WriteLine($"Pattern file {pattern} not exists!");
+    return;
+}
+
+if (!File.Exists(questions_file))
+{
+    Console.WriteLine($"Pattern file {questions_file} not exists!");
+    return;
+}
+
+
 
 
 #endregion
@@ -200,6 +223,18 @@ if (randomize)
     R.Shuffle(exams);
 }
 
+if (randomize_in_cars)
+{
+    Parallel.For(0, exams.Count, i =>
+    {
+        R.Shuffle(exams[i]);
+        R.Shuffle(exams[i]);
+        R.Shuffle(exams[i]);
+        R.Shuffle(exams[i]);
+        R.Shuffle(exams[i]);
+    });
+}
+
 
 foreach (var exam in exams)
 {
@@ -208,7 +243,7 @@ foreach (var exam in exams)
 
 int progr = 0;
 int max = exams.Count;
-max = 5;
+//max = 5;
 object locker = new object();
 int counter = 0;
 
@@ -223,6 +258,8 @@ for (int i=0; i<exams.Count; ++i)
     var exam = exams[i];
     var _template = template_file;
 
+    _template.Replace("%number%", i.ToString());
+
     for (int j = 0; j < exam.Count; ++j)
     {
         _template = _template.Replace($"%q{j+1}%", questions_strings[exam[j]]);
@@ -231,6 +268,7 @@ for (int i=0; i<exams.Count; ++i)
     File.WriteAllText(out_file_name + ".tex", _template);
 }
 
+Console.CursorVisible = false;
 Parallel.For(0, max, i =>
 { 
 
@@ -240,20 +278,42 @@ Parallel.For(0, max, i =>
     p.StartInfo = new ProcessStartInfo(latex_cmd);
     p.StartInfo.Arguments = $" -output-directory=\"{output_dir}\" {out_file_name}.tex {latex_args}";
     p.StartInfo.WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory;
-    //p.StartInfo.CreateNoWindow = true;
-    //p.StartInfo.UseShellExecute = false;
+    p.StartInfo.CreateNoWindow = true;
+    p.StartInfo.UseShellExecute = false;
     p.Start();
 
     //var p = System.Diagnostics.Process.Start("pdflatex", $" -output-directory=pdf Rezult/var{i+1}.tex");
     p.WaitForExit();
-    File.Delete(out_file_name+".aux");
-    File.Delete(out_file_name+".log");
+    if (clear_level>=1)
+        File.Delete($"{ out_file_name}.tex");
+    if (clear_level>=2)
+    {
+        File.Delete(out_file_name + ".aux");
+        File.Delete(out_file_name + ".log");
+    }
+
+    
     //Console.WriteLine($"Rezult\\var{i + 1}.tex");
     lock (locker)
     {
         counter++;
-        Console.WriteLine(Math.Round(1.0 * counter / max * 100, 5));
-        Console.SetCursorPosition(0, Console.CursorTop - 1);
+
+
+        string s = $"{counter}/{max}";
+        int w = Console.WindowWidth  - s.Length;
+        int left = (int)Math.Round(1.0 * counter / max  * (w-2), 0);
+        
+        int right = w-2-left;
+        string line = $"{s}[{new string('\u2588',left)}{new string('-',right)}]";
+        Console.Write(new string(' ', Console.WindowWidth));
+        Console.SetCursorPosition(0, Console.CursorTop);
+        if (File.Exists($"{out_file_name}.pdf"))
+            Console.WriteLine($"{out_file_name}.pdf - OK!");
+        else
+            Console.WriteLine($"{out_file_name}.pdf - ERR!");
+        Console.Write(line);
+        
+        Console.SetCursorPosition(0, Console.CursorTop );
     }
 
 });
