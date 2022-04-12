@@ -30,7 +30,7 @@ namespace Bilets
     {
         public List<Subgroup> subgroups { set; get; } = new List<Subgroup>();
         public IList<int> positions = new int[0];
-        public List<IList<int>> states { get; } = new List<IList<int>>();
+        public List<IList<Question>> states { get; } = new List<IList<Question>>();
         public List<IList<Subgroup>> variants { get; } = new List<IList<Subgroup>>();
         public void make_all_variants()
         {
@@ -114,7 +114,7 @@ namespace Bilets
 
     public class Subgroup
     {
-        public List<int> questions { set; get; } = new List<int>();
+        public IList<Question> questions { set; get; } = new List<Question>();
     };
 
     static class R
@@ -152,6 +152,12 @@ namespace Bilets
                 list[n] = value;
             }
         }
+    }
+    public class Question
+    {
+        public string Text { set; get; } = string.Empty;
+        public IList<int> marks { set; get; } = new int[0];
+
     }
 
 }

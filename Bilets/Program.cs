@@ -95,6 +95,7 @@ if (!File.Exists(questions_file))
 
 
 
+
 #endregion
 
 var questions_strings = File.ReadAllLines(questions_file).ToList<string>();
@@ -131,20 +132,46 @@ for (int i = 0; i < questions_strings.Count; ++i)
     }
     else
     {
+        string _pattern = @"^ *\[mark=\d+( *, *\d+)*\] *";
+        string q_string = s;
+        var marks = new int[0];
+
+        Question q = new Question();
+
+        if (Regex.IsMatch(s, _pattern))
+        {
+            var match = Regex.Match(s, _pattern);
+            q_string = s.Substring(match.Captures[0].Index + match.Captures[0].Length);
+            var mark_string = match.Value;
+            marks = Regex.Matches(mark_string, @"\d+").Select(x => Int32.Parse(x.Value)).ToArray();
+        }        
+        q.Text = q_string;
+        q.marks = marks;
+
         if (cur_sub == null)
         {
             var _sub = new Subgroup();
-            _sub.questions.Add(i);
+            _sub.questions.Add(q);
             cur_gr.subgroups.Add(_sub);
         }
         else
         {
-            cur_sub.questions.Add(i);
+            cur_sub.questions.Add(q);
         }
         
     }
     
 }
+
+foreach (var gr in groups)
+{
+    if (gr.positions.Count > gr.subgroups.Count)
+    {
+        Console.WriteLine("In groups position cont must be bigger then subgrup count!");
+        return;
+    }
+}
+
 var group_states = new Dictionary<Bilets.Group, IList<IList<int>>>();
 
 Dictionary<int, Bilets.Group> positions = new Dictionary<int, Bilets.Group>();
@@ -155,9 +182,6 @@ foreach (var gr in groups)
 }
 
 
-
-List<IList<int>> all_bilet_states = new List<IList<int>>();
-
 var last_bilet_state = groups.Select(x => x.states.Count-1);
 var billet_state = groups.Select(x => 0).ToArray();
 
@@ -165,7 +189,9 @@ var all_bilets = new List<IList<int>>();
 
 while (true)
 {
-    all_bilets.Add(billet_state.Select(x=>x).ToArray());
+   
+    
+    all_bilets.Add(billet_state.Select(x => x ).ToArray());
     
     if (billet_state.SequenceEqual(last_bilet_state) )
     {
@@ -194,11 +220,11 @@ foreach (var gr in groups)
     }
 }
 
-List<IList<int>> exams = new List<IList<int>>();
+List<IList<Question>> exams = new List<IList<Question>>();
 
 foreach (var bilet in all_bilets)
 {
-    var exam = new int[positions.Count];
+    var exam = new Question[positions.Count];
     for (int i=0; i<groups.Count; ++i)
     {
         var gr_state = groups[i].states[bilet[i]];
@@ -208,10 +234,19 @@ foreach (var bilet in all_bilets)
         }
     }
 
-
-    exams.Add(exam);
-    
-    
+    bool addible = true;
+    for (int i=0; i<exam.Length; ++i)
+        for (int j=i+1; j<exam.Length; ++j)
+        {
+            if ( exam[i].marks.Intersect(exam[j].marks).Count() != 0)
+            {
+                addible = false;
+                i = exam.Length;
+                break;
+            }
+        }
+    if (addible)
+        exams.Add(exam);    
 } 
 
 if (randomize)
@@ -238,7 +273,7 @@ if (randomize_in_cars)
 
 foreach (var exam in exams)
 {
-    Console.WriteLine(exam.Select(x => questions_strings[x]).Aggregate((a, b) => a + " " + b));
+    Console.WriteLine(exam.Select(x => x.Text).Aggregate((a, b) => a + " " + b));
 }
 
 int progr = 0;
@@ -258,11 +293,11 @@ for (int i=0; i<exams.Count; ++i)
     var exam = exams[i];
     var _template = template_file;
 
-    _template.Replace("%number%", i.ToString());
+    _template = _template.Replace("%number%", i.ToString()+1);
 
     for (int j = 0; j < exam.Count; ++j)
     {
-        _template = _template.Replace($"%q{j+1}%", questions_strings[exam[j]]);
+        _template = _template.Replace($"%q{j+1}%", exam[j].Text);
     }
     
     File.WriteAllText(out_file_name + ".tex", _template);
