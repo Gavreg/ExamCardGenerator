@@ -167,7 +167,7 @@ foreach (var gr in groups)
 {
     if (gr.positions.Count > gr.subgroups.Count)
     {
-        Console.WriteLine("In groups position cont must be bigger then subgrup count!");
+        Console.WriteLine("In groups position count must be bigger then subgroup count!");
         return;
     }
 }
