@@ -2,7 +2,7 @@
   "profiles": {
     "Bilets": {
       "commandName": "Project",
-      "commandLineArgs": "-q ../../../data/stsrpo.txt -r -d ../../../data/out/ -p ../../../data/pattern.tex -r -c 2"
+      "commandLineArgs": "-q ../../../data/ikt2.txt -r -p ../../../data/pattern_ikt2.tex -r -c 2 -u 1"
     }
   }
 }

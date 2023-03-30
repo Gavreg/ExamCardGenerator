@@ -1,14 +1,8 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
-using System.Linq;
-using System.Threading.Tasks;
-using System.Threading;
+using Bilets;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
-using System.Collections.Generic;
-using  Bilets;
-
-
 
 string latex_cmd = "pdflatex";
 string questions_file = "questions.txt";
@@ -18,7 +12,10 @@ bool randomize = false;
 bool randomize_in_cars = false;
 string latex_args = "";
 string pattern = "patern.txt";
-int clear_level = 0;
+int clear_level = 2;
+string seed = "";
+int questionCount = 0;
+bool showTex = false;
 
 
 
@@ -31,49 +28,86 @@ if (args.Length!=0)
     {
         switch (args[i])
         {
+            case "-?":
             case "-h":
-            case "--help": Console.WriteLine("HelpMsg\n"); return;
+            case "--help": 
+                Console.WriteLine("BILETS [OPTIONS]");
+                Console.WriteLine("");
+                Console.WriteLine("OPTIONS:");
+                Console.WriteLine("  -l\n" +
+                                  "  --latex         - команда вызова компилятора latex)");
+                Console.WriteLine("                  (def: pdflatex)");
+                Console.WriteLine("  -a \n" +
+                                  "  --arguments     - аргументы компилятора latex");
+                Console.WriteLine("                  (def: \"\"");
+                Console.WriteLine("  -q\n" +
+                                  "  --questions     - файл с вопросами");
+                Console.WriteLine("                  (def: questions.txt)");
+                Console.WriteLine("  -d\n" +
+                                 " --directory       - путь вывода результата, \\ на конце!");
+                Console.WriteLine("                  (def: ./");
+                Console.WriteLine("  -r \n" +
+                                  "  --random        - перемешать билеты");
+                Console.WriteLine("  -R \n" +
+                                  "  --Random        - перемешать вопросы внутри билетов");
+                Console.WriteLine("  -p\n" +
+                                  "  --pattern       - фалй c Tex-шаблоном для билетов");
+                Console.WriteLine("                  (def: patern.txt");
+                Console.WriteLine("  -с \n" +
+                                  "  --clear-level   - уровень отчистки");
+                Console.WriteLine("  -s \n" +
+                                  "  --show-Tex      - отобразить окно Latex");
+                Console.WriteLine("                  1 - удаление .aux .log .out .dvi");
+                Console.WriteLine("                  2 -  1 + удаление .tex");
+                Console.WriteLine("                  (def: 2");
+
+
+
+                return;
             case "-l":
             case "--latex":
-                latex_cmd = args[i+1];
-                i++;
+                latex_cmd = args[++i];
                 continue;
             case "-q":
             case "--questions":
-                questions_file = args[i+1];
-                i++;
+                questions_file = args[++i];
                 continue;
             case "-d":
             case "--directory":
-                output_dir = args[i+1];
-                i++;
+                output_dir = args[++i];
                 continue;
             case "-f":
             case "--filename":
-                output_file = args[i+1];
-                i++;
+                output_file = args[++i];
                 continue;
             case "-r":
             case "--random":
                 randomize = true;
                 continue;
             case "-R":
+            case "-Random":
                 randomize_in_cars = true;
                 continue;
             case "-a":
             case "--arguments":
-                latex_args = args[i+1];
-                i++;
+                latex_args = args[++i];
                 continue;
             case "-p":
             case "--pattern":
-                pattern = args[i + 1];
-                i++;
+                pattern = args[++i];
                 continue;
             case "-c":
             case "--clear-level":
                 clear_level = Int32.Parse(args[++i]);
                 continue;
+            case "-s":
+            case "--show_tex":
+                showTex = true;
+                continue;
+            case "-u":
+                questionCount = Int32.Parse(args[++i]);
+                continue;
+
             default: 
                 break;
         }
@@ -88,24 +122,20 @@ if (!File.Exists(pattern))
 
 if (!File.Exists(questions_file))
 {
-    Console.WriteLine($"Pattern file {questions_file} not exists!");
+    Console.WriteLine($"Questions file {questions_file} not exists!");
     return;
 }
-
-
-
-
 
 #endregion
 
 var questions_strings = File.ReadAllLines(questions_file).ToList<string>();
 var questions = new Bilets.Group();
   
-
 int _curent_list = -1;
 Subgroup cur_sub = null;
 Bilets.Group cur_gr = null;
 var groups = new List<Bilets.Group>();
+var all_questions = new List<Question>();
 
 for (int i = 0; i < questions_strings.Count; ++i)
 {
@@ -158,6 +188,7 @@ for (int i = 0; i < questions_strings.Count; ++i)
         {
             cur_sub.questions.Add(q);
         }
+        all_questions.Add(q);
         
     }
     
@@ -171,6 +202,8 @@ foreach (var gr in groups)
         return;
     }
 }
+
+
 
 var group_states = new Dictionary<Bilets.Group, IList<IList<int>>>();
 
@@ -189,9 +222,8 @@ var all_bilets = new List<IList<int>>();
 
 while (true)
 {
-   
-    
-    all_bilets.Add(billet_state.Select(x => x ).ToArray());
+
+    all_bilets.Add(billet_state.Select(x => x).ToArray());
     
     if (billet_state.SequenceEqual(last_bilet_state) )
     {
@@ -203,6 +235,7 @@ while (true)
         if (billet_state[i] == groups[i].states.Count-1)
         {
             billet_state[i] = 0;
+            
         }
         else
         {
@@ -249,6 +282,95 @@ foreach (var bilet in all_bilets)
         exams.Add(exam);    
 } 
 
+if (questionCount > 0)
+{
+    Dictionary<Question, int> _counters = new Dictionary<Question, int>(); 
+          
+    var _exams = new List<IList<Question>>();  //итоговый набор билетов
+
+    for (int i=0; i<questionCount; ++i)
+    {
+        var __exams = exams.Select(x=>x).ToList();  //временный наблор билетов, из которого мы добавляем новые
+        
+        //удаляем уже добавленные билеты из общего набора вариантов
+        foreach (var e in _exams)
+        {
+            exams.Remove(e);
+        }
+
+        //считаем кол-во вопросов в билете
+        foreach (var q in all_questions)
+        {
+            _counters[q] = 0;            
+        }    
+
+        foreach (var e in exams)
+        {
+            foreach (var q in e)
+            {
+                _counters[q]++;
+            }
+        }
+
+        while (__exams.Count!=0)
+        {
+            var ___eee = __exams.Select(x=>x).ToList();
+            R.Shuffle(___eee);
+            ___eee.Sort((a, b) => a.Sum(x => _counters[x]).CompareTo(b.Sum(x => _counters[x])));
+            var rare = ___eee.First();
+            _exams.Add(rare);
+
+            foreach(var q in rare)
+            {
+                __exams.RemoveAll(x => x.Contains(q));
+            }
+        }
+    }
+
+    again:
+    //докидка в набор билетов вопросв, кол-во которых не достаточно
+
+    //считаем кол-во вопросов в новом наборе билетов
+    foreach (var q in all_questions)
+    {
+        _counters[q] = 0;
+    }
+
+    foreach (var e in _exams)
+    {
+        foreach (var q in e)
+        {
+            _counters[q]++;
+        }
+    }
+
+    
+    foreach(var k in _counters.Keys)
+    {
+        if (_counters[k] < questionCount)
+        {
+            //берем набор билетов с нужным вопросом
+            var _ex = exams.Where(x => x.Contains(k)).ToList();
+            if (_ex.Count == 0)
+            {
+                Console.WriteLine("Генерация билтов с указаннаыми параметрами невозможна.");
+                return;
+            }
+            //ищем билет с вопросами, которые реже всего встречаются
+
+            R.Shuffle(_ex);
+            _ex.Sort((a, b) => a.Sum(x => _counters[x]).CompareTo(b.Sum(x => _counters[x])));
+            var rare = _ex.First();
+            exams.Remove(rare);
+            _exams.Add(rare);
+            goto again;
+        }
+    }
+
+    exams = _exams;
+}
+
+
 if (randomize)
 {
     R.Shuffle(exams);
@@ -271,84 +393,139 @@ if (randomize_in_cars)
 }
 
 
-foreach (var exam in exams)
+//foreach (var exam in exams)
 {
-    Console.WriteLine(exam.Select(x => x.Text).Aggregate((a, b) => a + " " + b));
+    //Console.WriteLine(exam.Select(x => x.Text).Aggregate((a, b) => a + " " + b));
+}
+
+
+
+int counter = 0;
+
+var template_file = File.ReadAllText(pattern);
+
+
+
+Console.CursorVisible = false;
+
+Dictionary<Question, int> counters = new Dictionary<Question, int>();
+
+foreach (var q in all_questions)
+{
+    counters[q]=0;
+}
+
+foreach (var e in exams)
+{
+    foreach(var q in e)
+    {
+        counters[q]++;
+    }
+}
+
+var ql = counters.Select(x => x).ToList();
+ql.Sort((a,b)=>a.Value.CompareTo(b.Value));
+
+
+Console.WriteLine();
+Console.WriteLine();
+
+foreach (var p in ql)
+{
+    Console.WriteLine($"{1.0*p.Value } - {p.Key.Text}");
+}
+
+
+FileInfo pattern_file_info = new FileInfo(pattern);
+DirectoryInfo output_dir_info;
+if (output_dir != "")
+    output_dir_info = new DirectoryInfo(output_dir);
+else
+    output_dir_info = new DirectoryInfo(".\\");
+
+if (output_dir_info.Exists == false)
+{
+    Directory.CreateDirectory(output_dir_info.FullName);
+}
+List<string> outputfiles = new List<string>();
+
+for (int i = 0; i < exams.Count; ++i)
+{
+    var out_file_name = $"{output_dir_info.FullName}{output_file}{i}";
+
+    var exam = exams[i];
+    var _template = template_file;
+
+    _template = _template.Replace("%number%", (i + 1).ToString());
+
+    for (int j = 0; j < exam.Count; ++j)
+    {
+        _template = _template.Replace($"%q{j + 1}%", exam[j].Text);
+    }
+
+    File.WriteAllText(out_file_name + ".tex", _template);
+    outputfiles.Add(out_file_name + ".tex");
 }
 
 int progr = 0;
 int max = exams.Count;
 //max = 5;
 object locker = new object();
-int counter = 0;
-
-var template_file = File.ReadAllText(pattern);
-
-Directory.CreateDirectory(output_dir);
-
-for (int i=0; i<exams.Count; ++i)
-{
-    var out_file_name = $"{output_dir}{output_file}{i}";
-
-    var exam = exams[i];
-    var _template = template_file;
-
-    _template = _template.Replace("%number%", i.ToString()+1);
-
-    for (int j = 0; j < exam.Count; ++j)
-    {
-        _template = _template.Replace($"%q{j+1}%", exam[j].Text);
-    }
-    
-    File.WriteAllText(out_file_name + ".tex", _template);
-}
-
-Console.CursorVisible = false;
 Parallel.For(0, max, i =>
 { 
 
-    var out_file_name = $"{output_dir}{output_file}{i}";
+    var out_file_name = $"{output_file}{i}";
 
     Process p = new Process();
     p.StartInfo = new ProcessStartInfo(latex_cmd);
-    p.StartInfo.Arguments = $" -output-directory=\"{output_dir}\" {out_file_name}.tex {latex_args}";
-    p.StartInfo.WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory;
-    p.StartInfo.CreateNoWindow = true;
-    p.StartInfo.UseShellExecute = false;
+    p.StartInfo.Arguments = $"{latex_args}";
+    if (output_dir != "")
+        p.StartInfo.Arguments += $" \"-output-directory={output_dir_info.Parent}\\{output_dir_info.Name}\" ";
+    
+    p.StartInfo.Arguments += $" \"{outputfiles[i]}\"";
+    //p.StartInfo.WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory;
+    p.StartInfo.WorkingDirectory = pattern_file_info.DirectoryName;
+    p.StartInfo.CreateNoWindow = !showTex;
+    p.StartInfo.UseShellExecute = showTex;
     p.Start();
 
-    //var p = System.Diagnostics.Process.Start("pdflatex", $" -output-directory=pdf Rezult/var{i+1}.tex");
+    //Console.WriteLine(p.StartInfo.Arguments);
+   
     p.WaitForExit();
     if (clear_level>=1)
-        File.Delete($"{ out_file_name}.tex");
+    {
+        File.Delete($"{output_dir_info.FullName}{out_file_name}.aux");
+        File.Delete($"{output_dir_info.FullName}{out_file_name}.log");
+        File.Delete($"{output_dir_info.FullName}{out_file_name}.dvi");
+        File.Delete($"{output_dir_info.FullName}{out_file_name}.out");
+
+    }        
     if (clear_level>=2)
     {
-        File.Delete(out_file_name + ".aux");
-        File.Delete(out_file_name + ".log");
+        File.Delete($"{output_dir_info.FullName}{out_file_name}.tex");
     }
-
     
     //Console.WriteLine($"Rezult\\var{i + 1}.tex");
     lock (locker)
     {
         counter++;
-
+                
+        Console.SetCursorPosition(0, Console.CursorTop);
+        Console.Write(new string(' ', Console.WindowWidth-1));
+        Console.SetCursorPosition(0, Console.CursorTop);
+        if (File.Exists($"{output_dir}{out_file_name}.pdf")) 
+            Console.WriteLine($"{output_dir_info.FullName}{out_file_name}.pdf - OK!");
+        else
+            Console.WriteLine($"{output_dir_info.FullName}{out_file_name}.pdf - ERR!");
 
         string s = $"{counter}/{max}";
-        int w = Console.WindowWidth  - s.Length;
-        int left = (int)Math.Round(1.0 * counter / max  * (w-2), 0);
-        
-        int right = w-2-left;
+        int w = Console.WindowWidth  - s.Length -2 -1;
+        int left = (int)Math.Round(1.0 * counter / max  * w, 0);
+        int right = w-left;
         string line = $"{s}[{new string('\u2588',left)}{new string('-',right)}]";
-        Console.Write(new string(' ', Console.WindowWidth));
         Console.SetCursorPosition(0, Console.CursorTop);
-        if (File.Exists($"{out_file_name}.pdf"))
-            Console.WriteLine($"{out_file_name}.pdf - OK!");
-        else
-            Console.WriteLine($"{out_file_name}.pdf - ERR!");
         Console.Write(line);
         
-        Console.SetCursorPosition(0, Console.CursorTop );
     }
 
 });

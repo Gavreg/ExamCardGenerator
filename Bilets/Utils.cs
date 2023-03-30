@@ -119,8 +119,6 @@ namespace Bilets
 
     static class R
     {
-
-
         public class RandomProportional : Random
         {
             // The Sample method generates a distribution proportional to the value
