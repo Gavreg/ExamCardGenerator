@@ -3,6 +3,10 @@
     "Bilets": {
       "commandName": "Project",
       "commandLineArgs": "-q ../../../data/ikt2.txt -r -p ../../../data/pattern_ikt2.tex -r -c 2 -u 1"
+    },
+    "Профиль 1": {
+      "commandName": "Project",
+      "commandLineArgs": "-q ../../../data/cppdz1.txt -r -p ../../../data/patterncpp.tex -r -c 3 -u 1 -n ../../../data/ADB2109.txt -d ../../../data/dz1 -v \"dzmunber=1\" -s"
     }
   }
 }

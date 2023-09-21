@@ -1,5 +1,7 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
+#define PARALEL
+
 using Bilets;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
@@ -16,6 +18,8 @@ int clear_level = 2;
 string seed = "";
 int questionCount = 0;
 bool showTex = false;
+string namesFile = "";
+string vars = "";
 
 
 
@@ -53,6 +57,14 @@ if (args.Length!=0)
                 Console.WriteLine("  -p\n" +
                                   "  --pattern       - фалй c Tex-шаблоном для билетов");
                 Console.WriteLine("                  (def: patern.txt");
+
+                Console.WriteLine("  -n\n" +
+                                  "  --names        - файл c именами вариантов");
+                Console.WriteLine("  -v \n" +
+                                  "  --vars         - набор параметров для подстановки в документ"+
+                                  "                  ПАРАМЕТР1=ЗНАЧЕНИЕ;ПАРАМЕТР2=ЗНАЧЕНИЕ... ");
+                
+
                 Console.WriteLine("  -с \n" +
                                   "  --clear-level   - уровень отчистки");
                 Console.WriteLine("  -s \n" +
@@ -60,6 +72,7 @@ if (args.Length!=0)
                 Console.WriteLine("                  1 - удаление .aux .log .out .dvi");
                 Console.WriteLine("                  2 -  1 + удаление .tex");
                 Console.WriteLine("                  (def: 2");
+
 
 
 
@@ -107,6 +120,14 @@ if (args.Length!=0)
             case "-u":
                 questionCount = Int32.Parse(args[++i]);
                 continue;
+            case "-n":
+            case "--names":
+                namesFile = args[++i];
+                continue;
+            case "-v":
+            case "--vars":
+                vars = args[++i];
+                continue;
 
             default: 
                 break;
@@ -126,7 +147,31 @@ if (!File.Exists(questions_file))
     return;
 }
 
+if (namesFile!="" && !File.Exists(namesFile))
+{
+    Console.WriteLine($"File with names  {namesFile} not exists!");
+    return;
+}
+
+
 #endregion
+
+string[] names = new string[0];
+
+if (namesFile != "")
+  names = File.ReadAllLines(namesFile);
+
+
+Dictionary<string, string> vars_dictionary = new Dictionary<string, string>();
+if (vars!="")
+{
+    var t = vars.Split(';',StringSplitOptions.RemoveEmptyEntries);
+    foreach(var x in t)
+    {
+        var y = x.Split("=", StringSplitOptions.RemoveEmptyEntries);
+        vars_dictionary[y[0].Trim()] = y[1].Trim();
+    }
+};
 
 var questions_strings = File.ReadAllLines(questions_file).ToList<string>();
 var questions = new Bilets.Group();
@@ -280,7 +325,13 @@ foreach (var bilet in all_bilets)
         }
     if (addible)
         exams.Add(exam);    
-} 
+}
+
+var exams_copy = exams.Select(x => x).ToList(); //копия, чтобы непохерить сгенереные все билеты
+
+making_variants:
+
+exams = exams_copy.Select(x => x).ToList();
 
 if (questionCount > 0)
 {
@@ -371,6 +422,17 @@ if (questionCount > 0)
 }
 
 
+if (names.Count()>0)
+{
+    if (names.Count() > exams.Count)
+    {
+        questionCount++;
+        Console.WriteLine("Увеличиваю кол-во повторений вопроса на 1 и повторяю генерацию...");
+        goto making_variants;
+    }
+}
+
+
 if (randomize)
 {
     R.Shuffle(exams);
@@ -436,31 +498,62 @@ foreach (var p in ql)
 }
 
 
+
+//генерим tex
+
 FileInfo pattern_file_info = new FileInfo(pattern);
 DirectoryInfo output_dir_info;
 if (output_dir != "")
+{
+   if (output_dir.Last()!='\\' && output_dir.Last() != '/')
+    {
+        output_dir += "\\";
+    }
     output_dir_info = new DirectoryInfo(output_dir);
+}    
 else
+{
     output_dir_info = new DirectoryInfo(".\\");
+}
+    
 
 if (output_dir_info.Exists == false)
 {
-    Directory.CreateDirectory(output_dir_info.FullName);
+    output_dir_info.Create();
 }
 List<string> outputfiles = new List<string>();
 
-for (int i = 0; i < exams.Count; ++i)
+int examsCount = exams.Count;
+if (names.Count() > 0)
+        examsCount = names.Count();
+
+for (int i = 0; i < examsCount; ++i)
 {
     var out_file_name = $"{output_dir_info.FullName}{output_file}{i}";
 
     var exam = exams[i];
     var _template = template_file;
 
+
     _template = _template.Replace("%number%", (i + 1).ToString());
+
+    string name = "";
+
+    if (names.Count() > 0)
+    {
+        _template = _template.Replace("%name%", names[i]);
+        out_file_name = $"{output_dir_info.FullName}{names[i]}";
+    }
+        
 
     for (int j = 0; j < exam.Count; ++j)
     {
         _template = _template.Replace($"%q{j + 1}%", exam[j].Text);
+    }
+
+    foreach (var v in vars_dictionary)
+    {
+        _template = _template.Replace($"%{v.Key}%", v.Value);
     }
 
     File.WriteAllText(out_file_name + ".tex", _template);
@@ -468,13 +561,28 @@ for (int i = 0; i < exams.Count; ++i)
 }
 
 int progr = 0;
-int max = exams.Count;
+
+int max = 0;
+if (names.Count() == 0)
+    max = exams.Count;
+else
+    max = names.Count();
 //max = 5;
 object locker = new object();
-Parallel.For(0, max, i =>
-{ 
 
-    var out_file_name = $"{output_file}{i}";
+
+
+#if PARALEL
+Parallel.For(0, max, i =>
+#else
+for (int i = 0; i<max; ++i)
+#endif
+{
+    string name = "";
+    if (names.Count() > 0)
+        name = names[i];
+
+    //var out_file_name = $"{output_file}{i}";
 
     Process p = new Process();
     p.StartInfo = new ProcessStartInfo(latex_cmd);
@@ -492,17 +600,20 @@ Parallel.For(0, max, i =>
     //Console.WriteLine(p.StartInfo.Arguments);
    
     p.WaitForExit();
+
+    
+    var __nn = Path.GetFileNameWithoutExtension(outputfiles[i]);
     if (clear_level>=1)
     {
-        File.Delete($"{output_dir_info.FullName}{out_file_name}.aux");
-        File.Delete($"{output_dir_info.FullName}{out_file_name}.log");
-        File.Delete($"{output_dir_info.FullName}{out_file_name}.dvi");
-        File.Delete($"{output_dir_info.FullName}{out_file_name}.out");
+        File.Delete($"{output_dir_info.FullName}{__nn}.aux");
+        File.Delete($"{output_dir_info.FullName}{__nn}.log");
+        File.Delete($"{output_dir_info.FullName}{__nn}.dvi");
+        File.Delete($"{output_dir_info.FullName}{__nn}.out");
 
     }        
     if (clear_level>=2)
     {
-        File.Delete($"{output_dir_info.FullName}{out_file_name}.tex");
+        File.Delete($"{output_dir_info.FullName}{__nn}.tex");
     }
     
     //Console.WriteLine($"Rezult\\var{i + 1}.tex");
@@ -513,10 +624,10 @@ Parallel.For(0, max, i =>
         Console.SetCursorPosition(0, Console.CursorTop);
         Console.Write(new string(' ', Console.WindowWidth-1));
         Console.SetCursorPosition(0, Console.CursorTop);
-        if (File.Exists($"{output_dir}{out_file_name}.pdf")) 
-            Console.WriteLine($"{output_dir_info.FullName}{out_file_name}.pdf - OK!");
+        if (File.Exists($"{output_dir}{__nn}.pdf")) 
+            Console.WriteLine($"{output_dir_info.FullName}{__nn}.pdf - OK!");
         else
-            Console.WriteLine($"{output_dir_info.FullName}{out_file_name}.pdf - ERR!");
+            Console.WriteLine($"{output_dir_info.FullName}{__nn}.pdf - ERR!");
 
         string s = $"{counter}/{max}";
         int w = Console.WindowWidth  - s.Length -2 -1;
@@ -528,7 +639,11 @@ Parallel.For(0, max, i =>
         
     }
 
+#if PARALEL
 });
+#else
+}
+#endif
 
 #region OldProgram
 /*
