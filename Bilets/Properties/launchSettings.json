@@ -7,6 +7,10 @@
     "Профиль 1": {
       "commandName": "Project",
       "commandLineArgs": "-q ../../../data/cppdz1.txt -r -p ../../../data/patterncpp.tex -r -c 3 -u 1 -n ../../../data/ADB2109.txt -d ../../../data/dz1 -v \"dzmunber=1\" -s"
+    },
+    "Profile 1": {
+      "commandName": "Project",
+      "commandLineArgs": "-q \"C:\\Users\\gavre\\OneDrive\\Преподство\\Материалы\\Cpp\\Home work\\cppdz3.txt\" -r -p \"C:\\Users\\gavre\\OneDrive\\Преподство\\Материалы\\Cpp\\Home work\\patterncpp.tex\" -r -c 3 -u 1 -n \"C:\\Users\\gavre\\OneDrive\\Преподство\\Материалы\\Cpp\\Home work\\ADB2209.txt\" -d \"C:\\Users\\gavre\\OneDrive\\Преподство\\Материалы\\Cpp\\Home work\\dz3\\ADB2209\" -v \"dzmunber=1\" -s"
     }
   }
 }

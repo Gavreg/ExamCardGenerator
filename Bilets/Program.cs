@@ -184,7 +184,10 @@ var all_questions = new List<Question>();
 
 for (int i = 0; i < questions_strings.Count; ++i)
 {
-    string s = questions_strings[i];
+    string s = questions_strings[i].Trim();
+
+    if (string.IsNullOrEmpty(s))
+        continue;
     
     if (Regex.IsMatch(s, @"^ *\[group=\d+( *, *\d+)*\] *$"))
     {
@@ -367,7 +370,7 @@ if (questionCount > 0)
         {
             var ___eee = __exams.Select(x=>x).ToList();
             R.Shuffle(___eee);
-            ___eee.Sort((a, b) => a.Sum(x => _counters[x]).CompareTo(b.Sum(x => _counters[x])));
+             ___eee.Sort((a, b) => a.Sum(x => _counters[x]).CompareTo(b.Sum(x => _counters[x])));
             var rare = ___eee.First();
             _exams.Add(rare);
 
@@ -498,6 +501,34 @@ foreach (var p in ql)
 }
 
 
+
+
+
+Dictionary<int, int> Bilets_analyse = new Dictionary<int, int>(); 
+for (int i = 0; i < exams.Count; ++i)
+{
+    for (int j = i + 1; j < exams.Count; ++j)
+    {
+        int coincidence_count = exams[i].Select(x => exams[j].Contains(x)?1:0).Sum();
+        if (coincidence_count != 0)
+        {
+            if (Bilets_analyse.ContainsKey(coincidence_count))
+                Bilets_analyse[coincidence_count]++;
+            else
+                Bilets_analyse[coincidence_count] = 1;
+        }
+            
+    }
+}
+
+Console.WriteLine();
+Console.WriteLine($"Проверка совпадений");
+Console.WriteLine($"КолВо вопр. - кол. во фактов совп.");
+foreach (var p in Bilets_analyse)
+{
+    Console.WriteLine($"{p.Key} - {p.Value}");
+}
+Console.WriteLine();
 
 //генерим tex
 
